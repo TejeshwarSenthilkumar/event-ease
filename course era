@@ -1,0 +1,126 @@
+@page "/eventease"
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager Nav
+
+<h1>🎉 Welcome to EventEase</h1>
+
+@if (!IsRegistered)
+{
+    <h2>Register for Event ID: @EventId</h2>
+
+    <EditForm Model="@Form" OnValidSubmit="@HandleSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div>
+            <label><b>Name:</b></label><br />
+            <InputText @bind-Value="Form.Name" placeholder="Your name" />
+            <ValidationMessage For="@(() => Form.Name)" />
+        </div>
+
+        <div class="mt-2">
+            <label><b>Email:</b></label><br />
+            <InputText @bind-Value="Form.Email" placeholder="you@example.com" />
+            <ValidationMessage For="@(() => Form.Email)" />
+        </div>
+
+        <button type="submit" class="btn btn-primary mt-3">Register</button>
+    </EditForm>
+}
+else
+{
+    <div class="alert alert-success mt-4">
+        ✅ Registered as <strong>@Session.Name</strong> (<em>@Session.Email</em>) for event <b>@EventId</b>
+    </div>
+
+    <h3>📋 Attendees for Event @EventId</h3>
+
+    @if (AttendanceList.Any())
+    {
+        <ul>
+            @foreach (var email in AttendanceList)
+            {
+                <li>@email</li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p>No attendees yet.</p>
+    }
+
+    <button class="btn btn-secondary mt-3" @onclick="ResetSession">🔄 Register another</button>
+}
+
+@code {
+    // Simulated services in the same file
+    private class UserSession
+    {
+        public string? Name { get; private set; }
+        public string? Email { get; private set; }
+        public bool IsRegistered { get; private set; }
+
+        public void Register(string name, string email)
+        {
+            Name = name;
+            Email = email;
+            IsRegistered = true;
+        }
+
+        public void Logout()
+        {
+            Name = null;
+            Email = null;
+            IsRegistered = false;
+        }
+    }
+
+    private class AttendanceService
+    {
+        private readonly Dictionary<int, HashSet<string>> _data = new();
+
+        public void MarkAttendance(int eventId, string email)
+        {
+            if (!_data.ContainsKey(eventId))
+                _data[eventId] = new HashSet<string>();
+
+            _data[eventId].Add(email);
+        }
+
+        public IEnumerable<string> GetAttendees(int eventId) =>
+            _data.TryGetValue(eventId, out var list) ? list : Enumerable.Empty<string>();
+    }
+
+    private class RegistrationForm
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    // Instance variables
+    private readonly UserSession Session = new();
+    private readonly AttendanceService Tracker = new();
+    private readonly RegistrationForm Form = new();
+    private readonly int EventId = 101;
+    private bool IsRegistered => Session.IsRegistered;
+    private IEnumerable<string> AttendanceList = [];
+
+    private void HandleSubmit()
+    {
+        Session.Register(Form.Name, Form.Email);
+        Tracker.MarkAttendance(EventId, Session.Email!);
+        AttendanceList = Tracker.GetAttendees(EventId);
+    }
+
+    private void ResetSession()
+    {
+        Session.Logout();
+        Form.Name = "";
+        Form.Email = "";
+        AttendanceList = [];
+    }
+}
